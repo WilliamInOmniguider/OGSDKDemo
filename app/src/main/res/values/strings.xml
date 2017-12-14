@@ -1,0 +1,7 @@
+<resources>
+    <string name="app_name">OmniguiderSDKDemo</string>
+    <string name="title_activity_ogmaps">Map</string>
+
+    <string name="error_dialog_title_text_normal">提 示</string>
+    <string name="error_dialog_message_text_api">發生未預期的錯誤，請檢察網路狀態</string>
+</resources>
