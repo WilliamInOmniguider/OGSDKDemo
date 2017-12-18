@@ -4,9 +4,11 @@ import android.app.Activity;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.text.TextUtils;
+import android.widget.ProgressBar;
 
 import com.android.volley.VolleyError;
 import com.google.android.gms.maps.model.LatLng;
+import com.google.android.gms.maps.model.LatLngBounds;
 import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.Polyline;
 import com.google.gson.Gson;
@@ -39,6 +41,10 @@ public class DataCacheManager {
         void onFinished(OGFloor floor);
     }
 
+    interface CheckUserInTaipeiCityHallCallback {
+        void onFinished(boolean isInTaipeiCityHall);
+    }
+
     private static DataCacheManager mDataCacheManager;
 
     public static final String USER_OUTDOOR = "outdoor";
@@ -60,6 +66,7 @@ public class DataCacheManager {
     // key : floorNumber, value : arrow markers on this floor
     private Map<String, List<Marker>> mFloorArrowMarkersMap;
     private OmniFloor mCurrentShowFloor;
+    private OmniFloor mUserCurrentFloor;
     private String mUserCurrentFloorLevel;
     private String mUserCurrentFloorPlanId;
     // key : buildingId, value : clusters in this building
@@ -207,16 +214,41 @@ public class DataCacheManager {
                 listener.onFinished(floor);
             }
         });
-//        OGFloor floor = null;
-//        if (floors != null) {
-//            for (OGFloor f : floors.getData()) {
-//                if (f.getFloorPlanId().equals(floorPlanId)) {
-//                    floor = f;
-//                    break;
-//                }
-//            }
-//        }
-//        return floor;
+    }
+
+    public void getBuildingDefaultFloor(Activity activity, final GetBuildingFloorListener listener) {
+        getBuildingFloors(activity, new GetBuildingFloorsListener() {
+            @Override
+            public void onFinished(OGFloors floors) {
+                OGFloor defaultFloor = null;
+                if (floors != null) {
+                    for (OGFloor f : floors.getData()) {
+                        if (f.getIsMap()) {
+                            defaultFloor = f;
+                        }
+                    }
+                }
+
+                listener.onFinished(defaultFloor);
+            }
+        });
+    }
+
+    public void isUserInTaipeiCityHall(Activity activity, final LatLng userLocation, final CheckUserInTaipeiCityHallCallback callback) {
+        getBuildingDefaultFloor(activity, new GetBuildingFloorListener() {
+            @Override
+            public void onFinished(OGFloor floor) {
+                boolean isUserInCityHall = false;
+                if (floor != null) {
+                    LatLngBounds bounds = new LatLngBounds(new LatLng(floor.getBlLatitude(), floor.getBlLongitude()),
+                            new LatLng(floor.getTrLatitude(), floor.getTrLongitude()));
+
+                    isUserInCityHall = bounds.contains(userLocation);
+                }
+
+                callback.onFinished(isUserInCityHall);
+            }
+        });
     }
 
 //    @Nullable
@@ -519,6 +551,10 @@ public class DataCacheManager {
         }
     }
 
+    public void setCurrentShowFloor(OmniFloor floor) {
+        mCurrentShowFloor = floor;
+    }
+
     @NonNull
     public OmniFloor getCurrentShowFloor() {
         if (mCurrentShowFloor == null) {
@@ -527,8 +563,16 @@ public class DataCacheManager {
         return mCurrentShowFloor;
     }
 
-    public void setCurrentShowFloor(OmniFloor floor) {
-        mCurrentShowFloor = floor;
+    public void setUserCurrentFloor(OmniFloor floor) {
+        mUserCurrentFloor = floor;
+    }
+
+    @NonNull
+    public OmniFloor getUserCurrentFloor() {
+        if (mUserCurrentFloor == null) {
+            mUserCurrentFloor = new OmniFloor(USER_OUTDOOR, USER_OUTDOOR);
+        }
+        return mUserCurrentFloor;
     }
 
     @NonNull

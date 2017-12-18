@@ -128,6 +128,13 @@ public class OptionsActivity extends Activity {
 //                }
             }
         });
+
+        findViewById(R.id.activity_options_emergency).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                startActivity(new Intent(OptionsActivity.this, OGEmergencyActivity.class));
+            }
+        });
     }
 
     private void onFloorSelected(final OGFloor floor) {
