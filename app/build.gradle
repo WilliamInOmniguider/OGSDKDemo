@@ -46,6 +46,6 @@ dependencies {
     compile 'com.google.maps.android:android-maps-utils:0.4+'
     compile 'com.google.android.gms:play-services:11.0.4'
     compile 'com.google.android.gms:play-services-maps:11.0.4'
-    compile 'com.github.WilliamInOmniguider:OmniguiderSDK:1.0.17'
+    compile 'com.github.WilliamInOmniguider:OmniguiderSDK:1.0.23'
     testCompile 'junit:junit:4.12'
 }

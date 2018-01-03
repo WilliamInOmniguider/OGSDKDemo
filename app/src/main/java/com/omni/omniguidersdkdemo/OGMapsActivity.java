@@ -273,41 +273,43 @@ public class OGMapsActivity extends AppCompatActivity implements OnMapReadyCallb
             @Override
             public void onClick(View v) {
 
-                if (OptionsActivity.isTestVersion()) {
-                    if (mMap != null) {
-                        mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(tiapeiGovLocation, 20.0f));
+//                if (OptionsActivity.isTestVersion()) {
+//                    if (mMap != null) {
+//                        mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(tiapeiGovLocation, 20.0f));
+//
+//                        DataCacheManager.getInstance().getBuildingFloors(OGMapsActivity.this,
+//                                new DataCacheManager.GetBuildingFloorsListener() {
+//                                    @Override
+//                                    public void onFinished(OGFloors floors) {
+//                                        OGFloor defaultFloor = null;
+//                                        for (OGFloor floor : floors.getData()) {
+//                                            if (floor.getIsMap()) {
+//                                                defaultFloor = floor;
+//                                                break;
+//                                            }
+//                                        }
+//                                        if (defaultFloor != null) {
+////Log.e("@W@", "fetchFloorPlan #1");
+//                                            fetchFloorPlan(defaultFloor.getFloorPlanId(), true, defaultFloor.getNumber());
+//
+//                                            collapseBottomSheet();
+//                                        }
+//                                    }
+//                                });
+//                    }
+//                } else {
+                if (mMap != null && mUserMarker != null && mLastLocation != null) {
 
-                        DataCacheManager.getInstance().getBuildingFloors(OGMapsActivity.this,
-                                new DataCacheManager.GetBuildingFloorsListener() {
-                                    @Override
-                                    public void onFinished(OGFloors floors) {
-                                        OGFloor defaultFloor = null;
-                                        for (OGFloor floor : floors.getData()) {
-                                            if (floor.getIsMap()) {
-                                                defaultFloor = floor;
-                                                break;
-                                            }
-                                        }
-                                        if (defaultFloor != null) {
-//Log.e("@W@", "fetchFloorPlan #1");
-                                            fetchFloorPlan(defaultFloor.getFloorPlanId(), true, defaultFloor.getNumber());
+                    LatLng current = new LatLng(mLastLocation.getLatitude(), mLastLocation.getLongitude());
+//                        LatLng current = new LatLng(mUserMarker.getPosition().latitude, mUserMarker.getPosition().longitude);
+                    addUserLocationMarker(current, mLastLocation);
+                    mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(current, MAP_ZOOM_LEVEL));
 
-                                            collapseBottomSheet();
-                                        }
-                                    }
-                                });
-                    }
-                } else {
-                    if (mMap != null && mLastLocation != null) {
-                        LatLng current = new LatLng(mLastLocation.getLatitude(), mLastLocation.getLongitude());
-                        addUserLocationMarker(current, mLastLocation);
-                        mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(current, MAP_ZOOM_LEVEL));
+                    Log.e("OGMapsActivity", "User current floor id : " + DataCacheManager.getInstance().getUserCurrentFloorPlanId());
 
-                        Log.e("OGMapsActivity", "User current floor id : " + DataCacheManager.getInstance().getUserCurrentFloorPlanId());
-
-                        fetchFloorPlan(DataCacheManager.getInstance().getUserCurrentFloorPlanId(), false, DataCacheManager.getInstance().getUserCurrentFloorLevel());
-                    }
+                    fetchFloorPlan(DataCacheManager.getInstance().getUserCurrentFloorPlanId(), false, DataCacheManager.getInstance().getUserCurrentFloorLevel());
                 }
+//                }
             }
         });
 
@@ -403,8 +405,7 @@ public class OGMapsActivity extends AppCompatActivity implements OnMapReadyCallb
 
     private void showNaviDirectlyProgress() {
         /** If navigation directly, show progress and count 30 sec */
-        Bundle args = getIntent().getExtras();
-        if (args != null) {
+        if (getIntent().getExtras() != null) {
             DialogTools.getInstance().showProgress(OGMapsActivity.this);
 
             mNaviDirectlyCountHandler = new Handler();
@@ -629,15 +630,12 @@ public class OGMapsActivity extends AppCompatActivity implements OnMapReadyCallb
             isUserMarkerReady = true;
         }
         Bundle args = getIntent().getExtras();
-        if (args != null) {
-            Log.e("@W@", "addUserLocationMarker args.containsKey(ARG_DESTINATION_NAME) : " + args.containsKey(ARG_DESTINATION_NAME) +
-                    ", containsKey(ARG_GO_TO_FLOOR_LEVEL) : " + args.containsKey(ARG_GO_TO_FLOOR_LEVEL));
-        }
-        if (args != null && !OptionsActivity.isTestVersion() && isFirstNavi &&
-                args.containsKey(ARG_DESTINATION_NAME) && args.containsKey(ARG_GO_TO_FLOOR_LEVEL)
-                && mIsInTaipeiGov) {
-            DialogTools.getInstance().showProgress(OGMapsActivity.this);
-            naviDirectly();
+        if (args != null && !OptionsActivity.isTestVersion() && isFirstNavi && mIsInTaipeiGov) {
+            if (args.containsKey(ARG_DESTINATION_NAME) && args.containsKey(ARG_GO_TO_FLOOR_LEVEL)) {
+                naviDirectly();
+            } else if (args.containsKey(ARG_EMERGENCY_NAVIGATION_USER_CURRENT_FLOOR_LEVEL) && args.containsKey(ARG_EMERGENCY_NAVIGATION_EMERGENCY_TYPE)) {
+                naviDirectly();
+            }
         }
     }
 
@@ -730,7 +728,7 @@ public class OGMapsActivity extends AppCompatActivity implements OnMapReadyCallb
 
 //        OmniFloor omniFloor = DataCacheManager.getInstance().getCurrentShowFloor();
 //        if (omniFloor == null ||
-//                (omniFloor != null && omniFloor.getFloorPlanId() != null && !omniFloor.getFloorPlanId().equals(correctFloorPlanId))) {
+//                (omniFloor != null && omniFloor.getFloorPlanId() != null && !omniFloor.getFloorPlanId().equals(id))) {
 
         DataCacheManager.getInstance().setCurrentShowFloor(new OmniFloor(String.valueOf(floorLevel), id));
 
@@ -815,10 +813,6 @@ public class OGMapsActivity extends AppCompatActivity implements OnMapReadyCallb
 
             Bundle args = getIntent().getExtras();
             if (args != null) {
-                Log.e("@W@", "fetchFloorPlan args.containsKey(ARG_DESTINATION_NAME) : " + args.containsKey(ARG_DESTINATION_NAME) +
-                        ", containsKey(ARG_GO_TO_FLOOR_LEVEL) : " + args.containsKey(ARG_GO_TO_FLOOR_LEVEL));
-            }
-            if (args != null) {
                 if (OptionsActivity.isTestVersion()) {
                     mNaviInfoTV.setText("目的地 : " + args.getString(ARG_DESTINATION_NAME) + ", 目的地樓層 : " + args.get(ARG_GO_TO_FLOOR_LEVEL));
 
@@ -831,35 +825,51 @@ public class OGMapsActivity extends AppCompatActivity implements OnMapReadyCallb
                             false);
 
                 } else {
-                    if (isFirstNavi && args.containsKey(ARG_DESTINATION_NAME) && args.containsKey(ARG_GO_TO_FLOOR_LEVEL) &&
-                            mIsInTaipeiGov) {
-                        DialogTools.getInstance().showProgress(OGMapsActivity.this);
-                        naviDirectly();
+                    if (isFirstNavi && mIsInTaipeiGov) {
+                        if (args.containsKey(ARG_DESTINATION_NAME) && args.containsKey(ARG_GO_TO_FLOOR_LEVEL)) {
+                            naviDirectly();
+                        } else if (args.containsKey(ARG_EMERGENCY_NAVIGATION_EMERGENCY_TYPE) && args.containsKey(ARG_EMERGENCY_NAVIGATION_USER_CURRENT_FLOOR_LEVEL)) {
+                            naviDirectly();
+                        }
                     }
                 }
             }
         }
+//        }
     }
 
     private void naviDirectly() {
         Log.e("@W@", "~~~ naviDirectly ~~~");
         Bundle args = getIntent().getExtras();
-        if (args != null && isUserMarkerReady && isIndoorMapReady && isFirstNavi &&
-                args.containsKey(ARG_DESTINATION_NAME) && args.containsKey(ARG_GO_TO_FLOOR_LEVEL) &&
-                mIsInTaipeiGov) {
+        if (args != null && isUserMarkerReady && isIndoorMapReady && isFirstNavi && mIsInTaipeiGov) {
 
-            mNaviInfoTV.setText("目的地 : " + args.getString(ARG_DESTINATION_NAME) + ", 目的地樓層 : " + args.get(ARG_GO_TO_FLOOR_LEVEL));
+            if (args.containsKey(ARG_DESTINATION_NAME) && args.containsKey(ARG_GO_TO_FLOOR_LEVEL)) {
+                DialogTools.getInstance().showProgress(OGMapsActivity.this);
 
-            OmniFloor omniFloor = DataCacheManager.getInstance().getCurrentShowFloor();
-            if (omniFloor != null) {
-                if (mUserMarker != null) {
-                    isFirstNavi = false;
+                mNaviInfoTV.setText("目的地 : " + args.getString(ARG_DESTINATION_NAME) + ", 目的地樓層 : " + args.get(ARG_GO_TO_FLOOR_LEVEL));
 
-                    getLocationToPRoute(args.getString(ARG_DESTINATION_ID),
-                            mUserMarker.getPosition().latitude,
-                            mUserMarker.getPosition().longitude,
-                            omniFloor.getFloorLevel(),
-                            false);
+                OmniFloor omniFloor = DataCacheManager.getInstance().getCurrentShowFloor();
+                if (omniFloor != null) {
+                    if (mUserMarker != null) {
+                        isFirstNavi = false;
+
+                        getLocationToPRoute(args.getString(ARG_DESTINATION_ID),
+                                mUserMarker.getPosition().latitude,
+                                mUserMarker.getPosition().longitude,
+                                omniFloor.getFloorLevel(),
+                                false);
+                    }
+                }
+            } else if (args.containsKey(ARG_EMERGENCY_NAVIGATION_USER_CURRENT_FLOOR_LEVEL) && args.containsKey(ARG_EMERGENCY_NAVIGATION_EMERGENCY_TYPE)) {
+                DialogTools.getInstance().showProgress(OGMapsActivity.this);
+
+                OmniFloor omniFloor = DataCacheManager.getInstance().getCurrentShowFloor();
+                if (omniFloor != null) {
+                    if (mUserMarker != null) {
+                        isFirstNavi = false;
+
+                        getEmergencyRoute(args.getString(ARG_EMERGENCY_NAVIGATION_EMERGENCY_TYPE));
+                    }
                 }
             }
         }
@@ -924,9 +934,9 @@ public class OGMapsActivity extends AppCompatActivity implements OnMapReadyCallb
                         if (floor == null) {
 
                         } else {
-                            LatLng current = new LatLng(floor.getLatitude(), floor.getLongitude());
-
-                            mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(current, MAP_ZOOM_LEVEL));
+//                            LatLng current = new LatLng(floor.getLatitude(), floor.getLongitude());
+//
+//                            mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(current, MAP_ZOOM_LEVEL));
 
                             removePreviousMarkers(buildingId);
 
@@ -1048,7 +1058,6 @@ public class OGMapsActivity extends AppCompatActivity implements OnMapReadyCallb
                 }
 
             }
-
         }
     }
 
@@ -1172,6 +1181,38 @@ public class OGMapsActivity extends AppCompatActivity implements OnMapReadyCallb
                 });
     }
 
+    private void getEmergencyRoute(String type) {
+
+        IndoorInfoManager.create().getEmergencyRoute(OGMapsActivity.this,
+                DataCacheManager.TAIPEI_CITY_GOV_BUILDING_ID,
+                mUserMarker.getPosition().latitude,
+                mUserMarker.getPosition().longitude,
+                DataCacheManager.getInstance().getUserCurrentFloorLevel(),
+                type,
+                new NetworkManager.NetworkManagerListener<OGNaviRoute>() {
+                    @Override
+                    public void onSucceed(OGNaviRoute ogNaviRoute) {
+                        if (ogNaviRoute.getResult().equals("true")) {
+                            if (ogNaviRoute.getNavigationalRoutePOIs().size() != 0) {
+                                startNavigation(ogNaviRoute, false);
+                            } else {
+                                DialogTools.getInstance().showErrorMessage(OGMapsActivity.this, "Error", "route POIs array size = false");
+                            }
+                        } else {
+                            DialogTools.getInstance().showErrorMessage(OGMapsActivity.this, "Error", "route result = false");
+                        }
+                    }
+
+                    @Override
+                    public void onFail(VolleyError volleyError, boolean b) {
+                        DialogTools.getInstance().showErrorMessage(OGMapsActivity.this,
+                                R.string.error_dialog_title_text_normal,
+                                getString(R.string.error_dialog_message_text_api));
+                    }
+                });
+
+    }
+
     private void startNavigation(OGNaviRoute route, boolean isReverseRoute) {
         if (route.getResult().equals("true")) {
             /** dismiss progress dialog that show by direct navigation*/
@@ -1196,10 +1237,10 @@ public class OGMapsActivity extends AppCompatActivity implements OnMapReadyCallb
                     if (previousPOI == null || poi.getFloorNumber().equals(previousPOI.getFloorNumber())) {
                         pointList.add(point);
                         if (i == route.getNavigationalRoutePOIs().size() - 1) {
-                            drawPolyline(poi.getFloorNumber(), pointList, colorIndex);
+                            drawPolyline(poi.getFloorNumber(), pointList, colorIndex % mPolyLineColors.length);
                         }
                     } else {
-                        drawPolyline(previousPOI.getFloorNumber(), pointList, colorIndex);
+                        drawPolyline(previousPOI.getFloorNumber(), pointList, colorIndex % mPolyLineColors.length);
                         pointList.clear();
                         pointList.add(point);
                         colorIndex++;
@@ -1216,10 +1257,10 @@ public class OGMapsActivity extends AppCompatActivity implements OnMapReadyCallb
                     if (previousPOI == null || poi.getFloorNumber().equals(previousPOI.getFloorNumber())) {
                         pointList.add(point);
                         if (i == route.getNavigationalRoutePOIs().size() - 1) {
-                            drawPolyline(poi.getFloorNumber(), pointList, colorIndex);
+                            drawPolyline(poi.getFloorNumber(), pointList, colorIndex % mPolyLineColors.length);
                         }
                     } else {
-                        drawPolyline(previousPOI.getFloorNumber(), pointList, colorIndex);
+                        drawPolyline(previousPOI.getFloorNumber(), pointList, colorIndex % mPolyLineColors.length);
                         pointList.clear();
                         pointList.add(point);
                         colorIndex++;

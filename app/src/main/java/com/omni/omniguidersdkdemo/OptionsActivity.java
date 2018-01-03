@@ -1,14 +1,31 @@
 package com.omni.omniguidersdkdemo;
 
+import android.*;
+import android.Manifest;
 import android.app.Activity;
+import android.bluetooth.BluetoothAdapter;
+import android.bluetooth.BluetoothDevice;
+import android.bluetooth.le.BluetoothLeScanner;
+import android.bluetooth.le.ScanCallback;
+import android.bluetooth.le.ScanResult;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.content.Intent;
+import android.content.pm.PackageManager;
+import android.location.LocationManager;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Message;
+import android.provider.Settings;
+import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.support.design.widget.TextInputEditText;
 import android.support.design.widget.TextInputLayout;
+import android.support.v4.app.ActivityCompat;
+import android.support.v7.app.AlertDialog;
 import android.support.v7.widget.AppCompatButton;
 import android.text.TextUtils;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -19,21 +36,84 @@ import android.widget.Spinner;
 import android.widget.Switch;
 import android.widget.TextView;
 
+import com.THLight.USBeacon.App.Lib.BatteryPowerData;
+import com.THLight.USBeacon.App.Lib.iBeaconData;
+import com.android.volley.VolleyError;
+import com.omni.omniguidersdkdemo.api.BeaconApi;
+import com.omni.omniguidersdkdemo.model.BeaconSetBatteryResponse;
+import com.omni.omninavi.omninavi.manager.NetworkManager;
 import com.omni.omninavi.omninavi.model.OGFloor;
 import com.omni.omninavi.omninavi.model.OGFloors;
 import com.omni.omninavi.omninavi.model.OGPOI;
+import com.omni.omninavi.omninavi.tool.DialogTools;
+
+import java.util.List;
 
 /**
  * Created by wiliiamwang on 06/12/2017.
  */
 
-public class OptionsActivity extends Activity {
+public class OptionsActivity extends Activity implements BluetoothAdapter.LeScanCallback {
 
     private static boolean IS_TEST_VERSION = false;
 
     public static boolean isTestVersion() {
         return IS_TEST_VERSION;
     }
+
+    private static final int REQUEST_CODE_PERMISSIONS = 90;
+
+    final int MSG_LE_START_SCAN = 1000;
+    final int MSG_LE_STOP_SCAN  = 1001;
+    final int MSG_GET_DATA 		= 1002;
+    final int MSG_STOP_SCAN     = 1003;
+
+    BluetoothAdapter mBTAdapter		= BluetoothAdapter.getDefaultAdapter();
+    Handler mHandler= new Handler()
+    {
+        @Override
+        public void handleMessage(Message msg)
+        {
+            switch(msg.what)
+            {
+                case MSG_LE_START_SCAN:
+                    if(mBTAdapter.isEnabled())
+                    {
+                        mBTAdapter.startLeScan(OptionsActivity.this);
+                    }
+                    mHandler.sendEmptyMessageDelayed(MSG_LE_STOP_SCAN, 2000);
+                    break;
+
+                case MSG_LE_STOP_SCAN:
+                    if(mBTAdapter.isEnabled())
+                    {
+                        mBTAdapter.stopLeScan(OptionsActivity.this);
+                    }
+                    mHandler.sendEmptyMessageDelayed(MSG_LE_START_SCAN, 200);
+
+                    break;
+                case MSG_STOP_SCAN:
+                    mHandler.removeMessages(MSG_LE_START_SCAN);
+                    mHandler.removeMessages(MSG_LE_STOP_SCAN);
+                    if(mBTAdapter.isEnabled())
+                    {
+                        mBTAdapter.stopLeScan(OptionsActivity.this);
+                    }
+
+//                    if(mPDSearch != null && mPDSearch.isShowing())
+//                    {
+//                        mPDSearch.dismiss();
+//                    }
+
+                    break;
+                case MSG_GET_DATA:
+//                    mListAdapter.notifyDataSetChanged();
+                    break;
+
+            }
+            super.handleMessage(msg);
+        }
+    };
 
     private TextInputLayout poiIdTIL;
     private TextInputEditText poiIdTIET;
@@ -42,8 +122,50 @@ public class OptionsActivity extends Activity {
     private AppCompatButton openMapBtn;
     private Spinner floorSpinner;
     private Spinner poiSpinner;
+    private TextView beaconBatteryLogTV;
 
     private OGFloor mGoToFloor;
+
+    @Override
+    public void onLeScan(final BluetoothDevice device, int rssi, byte[] scanRecord) {
+        // TODO Auto-generated method stub
+
+        final BatteryPowerData BP = BatteryPowerData.generateBatteryBeacon(scanRecord);
+
+        if(BP != null &&  BP.BatteryUuid.toUpperCase().startsWith("00112233-4455-6677-8899-AABBCCDDEEFF")) {
+            mHandler.obtainMessage(MSG_GET_DATA).sendToTarget();
+            Log.e("@W@", "BatteryPower:" + BP.batteryPower +
+                    "\naddress : " + device.getAddress() +
+                    "\ndevice name : " + device.getName() +
+                    "\nrssi : " + rssi);
+            BeaconApi.getInstance().setBeaconBatteryLevel(OptionsActivity.this,
+                    device.getAddress(),
+                    BP.batteryPower + "",
+                    new NetworkManager.NetworkManagerListener<BeaconSetBatteryResponse>() {
+                        @Override
+                        public void onSucceed(BeaconSetBatteryResponse response) {
+                            if (response.isSuccess()) {
+                                beaconBatteryLogTV.setText("Beacon Mac : " + device.getAddress() +
+                                        "\nBattery Level : " + BP.batteryPower);
+                            }
+                        }
+
+                        @Override
+                        public void onFail(VolleyError volleyError, boolean b) {
+
+                        }
+                    });
+        }
+        else if(BP == null)
+        {
+        }
+
+    }
+
+    public void testScan() {
+        mHandler.sendEmptyMessage(MSG_LE_START_SCAN);
+//        mHandler.sendEmptyMessageDelayed(MSG_STOP_SCAN,20000);
+    }
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
@@ -51,6 +173,9 @@ public class OptionsActivity extends Activity {
 
         setContentView(R.layout.activity_options);
 
+        Log.e("@W@", "onCreate");
+
+//        mac : 98:07:2D:07:B5:00, minor : 98
         poiIdTIL = (TextInputLayout) findViewById(R.id.activity_options_til_poi_id);
         poiIdTIET = (TextInputEditText) findViewById(R.id.activity_options_tiet_poi_id);
         poiNameTIET = (TextInputEditText) findViewById(R.id.activity_options_tiet_poi_name);
@@ -129,12 +254,92 @@ public class OptionsActivity extends Activity {
             }
         });
 
-        findViewById(R.id.activity_options_emergency).setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                startActivity(new Intent(OptionsActivity.this, OGEmergencyActivity.class));
+//        findViewById(R.id.activity_options_emergency).setOnClickListener(new View.OnClickListener() {
+//            @Override
+//            public void onClick(View v) {
+//                startActivity(new Intent(OptionsActivity.this, OGEmergencyActivity.class));
+//            }
+//        });
+        beaconBatteryLogTV = (TextView) findViewById(R.id.activity_options_battery_log);
+
+        checkLocationService();
+    }
+
+    private void checkLocationService() {
+        LocationManager manager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
+
+        if (manager.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
+            ensurePermissions();
+        } else {
+            AlertDialog.Builder dialog = new AlertDialog.Builder(this);
+            dialog.setMessage("位置服務尚未開啟，請設定");
+            dialog.setPositiveButton("open settings", new DialogInterface.OnClickListener() {
+                @Override
+                public void onClick(DialogInterface paramDialogInterface, int paramInt) {
+                    // TODO Auto-generated method stub
+                    Intent myIntent = new Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS);
+                    startActivity(myIntent);
+                }
+            });
+            dialog.setNegativeButton("cancel", new DialogInterface.OnClickListener() {
+
+                @Override
+                public void onClick(DialogInterface paramDialogInterface, int paramInt) {
+                    // TODO Auto-generated method stub
+                    DialogTools.getInstance().showErrorMessage(OptionsActivity.this,
+                            getString(R.string.error_dialog_title_text_normal),
+                            "沒有開啟位置服務，無法顯示正確位置");
+                }
+            });
+            dialog.show();
+        }
+    }
+
+    private void ensurePermissions() {
+
+        if (ActivityCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED ||
+                ActivityCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED ||
+                ActivityCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_WIFI_STATE) != PackageManager.PERMISSION_GRANTED ||
+                ActivityCompat.checkSelfPermission(this, android.Manifest.permission.CHANGE_WIFI_STATE) != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(this, new String[]{android.Manifest.permission.CHANGE_WIFI_STATE,
+                            android.Manifest.permission.ACCESS_WIFI_STATE,
+                            android.Manifest.permission.ACCESS_FINE_LOCATION,
+                            android.Manifest.permission.ACCESS_COARSE_LOCATION},
+                    REQUEST_CODE_PERMISSIONS);
+
+        } else {
+            testScan();
+        }
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+
+        if (requestCode == REQUEST_CODE_PERMISSIONS) {
+            if (grantResults.length > 0) {
+
+                boolean shouldRegetPermission = false;
+
+                for (int result : grantResults) {
+                    if (result != 0) {
+                        shouldRegetPermission = true;
+                        break;
+                    }
+                }
+
+                if (shouldRegetPermission) {
+                    ActivityCompat.requestPermissions(this, new String[]{android.Manifest.permission.CHANGE_WIFI_STATE,
+                                    android.Manifest.permission.ACCESS_WIFI_STATE,
+                                    android.Manifest.permission.ACCESS_FINE_LOCATION,
+                                    Manifest.permission.ACCESS_COARSE_LOCATION},
+                            REQUEST_CODE_PERMISSIONS);
+                } else {
+                    testScan();
+                }
+
             }
-        });
+        }
     }
 
     private void onFloorSelected(final OGFloor floor) {
@@ -154,6 +359,19 @@ public class OptionsActivity extends Activity {
                 }
             });
         }
+    }
+
+    @Override
+    protected void onDestroy() {
+        mHandler.removeMessages(MSG_LE_START_SCAN);
+        mHandler.removeMessages(MSG_LE_STOP_SCAN);
+        mHandler.sendEmptyMessage(MSG_STOP_SCAN);
+        if(mBTAdapter.isEnabled())
+        {
+            mBTAdapter.stopLeScan(this);
+        }
+        Log.e("@W@", "onDestroy");
+        super.onDestroy();
     }
 
     class OptionsSpinnerAdapter<T> extends BaseAdapter {
